@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表情包大师 - 在线生成专属表情包</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>😎 表情包大师</h1>
+            <p>上传照片，一键生成专属表情包！</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>点击或拖拽上传照片</h3>
+                    <p>支持 JPG、PNG 格式，文件大小 ≤ 5MB</p>
+                    <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.gif" hidden>
+                </div>
+
+                <div class="style-selection">
+                    <label for="styleSelect">选择表情包风格：</label>
+                    <select id="styleSelect">
+                        <option value="panda">🐼 熊猫头</option>
+                        <option value="mushroom">🍄 蘑菇头</option>
+                        <option value="dragon">🐉 龙图</option>
+                    </select>
+                </div>
+
+                <button id="generateBtn" class="generate-btn" disabled>生成表情包</button>
+            </div>
+
+            <div class="result-section" id="resultSection" style="display: none;">
+                <h3>生成结果</h3>
+                <div class="result-image-container">
+                    <img id="resultImage" src="" alt="生成的表情包">
+                </div>
+                <div class="result-actions">
+                    <button id="downloadBtn" class="download-btn">下载表情包</button>
+                    <button id="regenerateBtn" class="regenerate-btn">重新生成</button>
+                </div>
+            </div>
+
+            <div class="loading-section" id="loadingSection" style="display: none;">
+                <div class="spinner"></div>
+                <p>正在生成表情包，请稍候...</p>
+            </div>
+
+            <div class="error-section" id="errorSection" style="display: none;">
+                <div class="error-message" id="errorMessage"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 表情包大师 - 程序设计实验项目</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
