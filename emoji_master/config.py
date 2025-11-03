@@ -34,12 +34,16 @@ class Config:
     FACE_DETECTION_CONFIDENCE = 0.05
     MIN_FACE_SIZE = 50
 
-    # 图像处理参数
+    # 图像处理参数 - 按照你的要求修改
     IMAGE_ENHANCE_PARAMS = {
-        'brightness': 1.65,
-        'contrast': 2.0,
-        'saturation': 0.0,
-        'exposure': 1.5
+        'brightness': 1.1,  # 亮度+10%（轻微提亮）
+        'contrast': 1.2,  # 对比度+20%（增强立体感）
+        'saturation': 0,  # 饱和度+10%（色彩更鲜艳）
+        'exposure': 1.1,  # 曝光+10%（轻微提亮）
+        'vibrance': 0,  # 自然饱和度+20%（智能增强色彩）
+        'temperature': 5,  # 色温+5（轻微暖色调，更自然）
+        'hue': 0,  # 色调不变
+        'lightness': 1.1  # 光感+10%（整体提亮）
     }
 
 
