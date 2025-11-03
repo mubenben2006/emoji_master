@@ -56,9 +56,17 @@ class StyleSynthesizer:
                 template = template.convert('RGBA')
                 print(f"🔄 模板转换为RGBA模式")
 
+            # 调试：检查人脸图像模式
+            print(f"🔍 人脸图像模式: {face_image.mode}, 尺寸: {face_image.size}")
+
+            # 确保人脸图像是RGBA模式
+            if face_image.mode != 'RGBA':
+                print(f"🔄 转换人脸为RGBA模式")
+                face_image = face_image.convert('RGBA')
+
             # 调整人脸尺寸
             face_resized = self._resize_face_for_template(face_image, template.size)
-            print(f"📏 人脸调整后尺寸: {face_resized.size}")
+            print(f"📏 人脸调整后尺寸: {face_resized.size}, 模式: {face_resized.mode}")
 
             # 合成图像
             result = self._blend_images(template, face_resized)
@@ -116,10 +124,15 @@ class StyleSynthesizer:
         new_height = max(new_height, 100)
 
         face_resized = face_image.resize((new_width, new_height), Image.LANCZOS)
+
+        # 确保调整大小后仍然是RGBA模式
+        if face_resized.mode != 'RGBA':
+            face_resized = face_resized.convert('RGBA')
+
         return face_resized
 
     def _blend_images(self, template, face_image):
-        """混合模板和人脸图像"""
+        """混合模板和人脸图像 - 修复透明通道问题"""
         # 创建结果图像副本
         result = template.copy()
 
@@ -133,17 +146,21 @@ class StyleSynthesizer:
         )
 
         print(f"📍 人脸放置位置: {position}")
+        print(f"🔍 粘贴前 - 人脸模式: {face_image.mode}, 模板模式: {template.mode}")
 
-        # 确保人脸图像是RGBA模式
-        if face_image.mode != 'RGBA':
-            face_rgba = face_image.convert('RGBA')
-            print(f"🔄 转换人脸为RGBA模式")
+        # 关键修复：确保使用alpha通道作为掩码
+        if face_image.mode == 'RGBA':
+            # 分离alpha通道
+            r, g, b, a = face_image.split()
+            print(f"🎭 Alpha通道范围: {a.getextrema()}")
+
+            # 使用alpha通道作为掩码粘贴
+            result.paste(face_image, position, a)
+            print("✅ 使用Alpha通道作为掩码粘贴")
         else:
-            face_rgba = face_image
-
-        # 直接粘贴（使用人脸作为蒙版）
-        print("🖼️ 开始合成...")
-        result.paste(face_rgba, position, face_rgba)
+            # 如果没有alpha通道，直接粘贴
+            result.paste(face_image, position)
+            print("⚠️  直接粘贴（无Alpha通道）")
 
         return result
 
