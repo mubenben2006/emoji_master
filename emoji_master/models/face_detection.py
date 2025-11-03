@@ -30,7 +30,7 @@ class FaceDetector:
         self.face_cascade = cv2.CascadeClassifier(local_file)
 
     def detect_and_crop_face(self, image_path):
-        """检测并裁剪人脸"""
+        """检测并裁剪人脸 - 只保留面部区域，背景透明"""
         try:
             # 读取图像
             image = cv2.imread(image_path)
@@ -56,25 +56,30 @@ class FaceDetector:
             faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
             x, y, w, h = faces[0]
 
-            # 扩展边界以确保完整人脸
-            margin_x = int(w * 0.2)
-            margin_y = int(h * 0.2)
-
-            height, width = image.shape[:2]
-            x1 = max(0, x - margin_x)
-            y1 = max(0, y - margin_y)
-            x2 = min(width, x + w + margin_x)
-            y2 = min(height, y + h + margin_y)
-
-            # 裁剪人脸
-            face_crop = image[y1:y2, x1:x2]
+            # 只裁剪精确的面部区域
+            face_crop = image[y:y + h, x:x + w]
 
             if face_crop.size == 0:
                 return None
 
-            # 转换为RGB并调整尺寸
-            face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
-            face_pil = Image.fromarray(face_rgb)
+            # 创建RGBA图像（带透明通道）
+            face_rgba = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGBA)
+
+            # 创建椭圆掩码
+            mask = np.zeros((h, w), dtype=np.uint8)
+            center_x, center_y = w // 2, h // 2
+            radius_x, radius_y = int(w * 0.45), int(h * 0.45)
+
+            # 绘制椭圆（填充白色）
+            cv2.ellipse(mask, (center_x, center_y), (radius_x, radius_y), 0, 0, 360, 255, -1)
+
+            # 将椭圆外部的alpha通道设置为0（完全透明）
+            face_rgba[:, :, 3] = mask
+
+            # 转换为PIL图像
+            face_pil = Image.fromarray(face_rgba)
+
+            # 调整尺寸
             face_resized = face_pil.resize(Config.FACE_SIZE, Image.LANCZOS)
 
             return face_resized
@@ -84,7 +89,7 @@ class FaceDetector:
             return None
 
     def detect_faces_with_confidence(self, image_path):
-        """带置信度的人脸检测（增强版本）"""
+        """带置信度的人脸检测（增强版本）- 只保留面部区域，背景透明"""
         try:
             image = cv2.imread(image_path)
             if image is None:
@@ -125,23 +130,28 @@ class FaceDetector:
 
             x, y, w, h = best_face
 
-            # 扩展边界
-            margin_x = int(w * 0.15)
-            margin_y = int(h * 0.15)
-
-            height, width = image.shape[:2]
-            x1 = max(0, x - margin_x)
-            y1 = max(0, y - margin_y)
-            x2 = min(width, x + w + margin_x)
-            y2 = min(height, y + h + margin_y)
-
-            face_crop = image[y1:y2, x1:x2]
+            # 只裁剪精确的面部区域
+            face_crop = image[y:y + h, x:x + w]
 
             if face_crop.size == 0:
                 return None, 0
 
-            face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
-            face_pil = Image.fromarray(face_rgb)
+            # 创建RGBA图像（带透明通道）
+            face_rgba = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGBA)
+
+            # 创建椭圆掩码
+            mask = np.zeros((h, w), dtype=np.uint8)
+            center_x, center_y = w // 2, h // 2
+            radius_x, radius_y = int(w * 0.45), int(h * 0.45)
+
+            # 绘制椭圆（填充白色）
+            cv2.ellipse(mask, (center_x, center_y), (radius_x, radius_y), 0, 0, 360, 255, -1)
+
+            # 将椭圆外部的alpha通道设置为0（完全透明）
+            face_rgba[:, :, 3] = mask
+
+            # 转换为PIL图像
+            face_pil = Image.fromarray(face_rgba)
             face_resized = face_pil.resize(Config.FACE_SIZE, Image.LANCZOS)
 
             return face_resized, best_confidence
