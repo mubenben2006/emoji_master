@@ -27,11 +27,9 @@ style_synthesizer = StyleSynthesizer()
 file_manager = FileManager()
 print("✅ 所有模块初始化完成")
 
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 @app.route('/generate', methods=['POST'])
 def generate_emoji():
@@ -40,6 +38,7 @@ def generate_emoji():
     print("🚀 收到生成表情包请求")
 
     try:
+        
         # 检查文件上传
         if 'photo' not in request.files:
             print("❌ 没有文件上传")
@@ -83,7 +82,7 @@ def generate_emoji():
             if face_image is None or confidence < Config.FACE_DETECTION_CONFIDENCE:
                 # 如果增强检测失败，尝试普通检测
                 print("🔄 尝试普通人脸检测...")
-                face_image = face_detector.detect_and_crop_face(upload_path)
+                face_image, face_confidence = face_detector.detect_faces_with_confidence(upload_path)
                 if face_image is None:
                     print("❌ 未检测到人脸")
                     return jsonify({
@@ -139,7 +138,6 @@ def generate_emoji():
             'message': '服务器内部错误'
         }), 500
 
-
 @app.route('/download/<filename>')
 def download_file(filename):
     """下载生成的表情包"""
@@ -157,7 +155,6 @@ def download_file(filename):
             'status': 'error',
             'message': '下载失败'
         }), 500
-
 
 if __name__ == '__main__':
     print("\n🌐 启动Flask服务器...")
