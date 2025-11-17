@@ -2,9 +2,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import os
-
 from config import Config
-
 
 class FaceDetector:
     """人脸检测模块 - 使用OpenCV Haar级联分类器"""
@@ -29,67 +27,8 @@ class FaceDetector:
 
         self.face_cascade = cv2.CascadeClassifier(local_file)
 
-    def detect_and_crop_face(self, image_path):
-        """检测并裁剪人脸 - 只保留面部区域，背景透明"""
-        try:
-            # 读取图像
-            image = cv2.imread(image_path)
-            if image is None:
-                return None
-
-            # 转换为灰度图
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-            # 检测人脸
-            faces = self.face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(Config.MIN_FACE_SIZE, Config.MIN_FACE_SIZE),
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
-
-            if len(faces) == 0:
-                return None
-
-            # 选择最大的人脸
-            faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
-            x, y, w, h = faces[0]
-
-            # 只裁剪精确的面部区域
-            face_crop = image[y:y + h, x:x + w]
-
-            if face_crop.size == 0:
-                return None
-
-            # 创建RGBA图像（带透明通道）
-            face_rgba = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGBA)
-
-            # 创建椭圆掩码
-            mask = np.zeros((h, w), dtype=np.uint8)
-            center_x, center_y = w // 2, h // 2
-            radius_x, radius_y = int(w * 0.45), int(h * 0.45)
-
-            # 绘制椭圆（填充白色）
-            cv2.ellipse(mask, (center_x, center_y), (radius_x, radius_y), 0, 0, 360, 255, -1)
-
-            # 将椭圆外部的alpha通道设置为0（完全透明）
-            face_rgba[:, :, 3] = mask
-
-            # 转换为PIL图像
-            face_pil = Image.fromarray(face_rgba)
-
-            # 调整尺寸
-            face_resized = face_pil.resize(Config.FACE_SIZE, Image.LANCZOS)
-
-            return face_resized
-
-        except Exception as e:
-            print(f"人脸检测错误: {str(e)}")
-            return None
-
     def detect_faces_with_confidence(self, image_path):
-        """带置信度的人脸检测（增强版本）- 只保留面部区域，背景透明"""
+        """带置信度的人脸检测 - 紧密裁剪长方形区域"""
         try:
             image = cv2.imread(image_path)
             if image is None:
@@ -130,32 +69,42 @@ class FaceDetector:
 
             x, y, w, h = best_face
 
-            # 只裁剪精确的面部区域
+            # 紧密裁剪：只扩展很少部分确保包含完整面部特征
+            expand_ratio = 0.02  # 只扩展2%
+            expand_x = int(w * expand_ratio)
+            expand_y = int(h * expand_ratio)
+
+            x = max(0, x - expand_x)
+            y = max(0, y - expand_y)
+            w = min(image.shape[1] - x, w + 2 * expand_x)
+            h = min(image.shape[0] - y, h + 2 * expand_y)
+
+            # 直接使用检测到的长方形区域，不强制转为正方形
+            # 裁剪长方形人脸区域
             face_crop = image[y:y + h, x:x + w]
 
             if face_crop.size == 0:
                 return None, 0
 
-            # 创建RGBA图像（带透明通道）
-            face_rgba = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGBA)
-
-            # 创建椭圆掩码
-            mask = np.zeros((h, w), dtype=np.uint8)
-            center_x, center_y = w // 2, h // 2
-            radius_x, radius_y = int(w * 0.45), int(h * 0.45)
-
-            # 绘制椭圆（填充白色）
-            cv2.ellipse(mask, (center_x, center_y), (radius_x, radius_y), 0, 0, 360, 255, -1)
-
-            # 将椭圆外部的alpha通道设置为0（完全透明）
-            face_rgba[:, :, 3] = mask
-
             # 转换为PIL图像
-            face_pil = Image.fromarray(face_rgba)
-            face_resized = face_pil.resize(Config.FACE_SIZE, Image.LANCZOS)
+            face_pil = Image.fromarray(cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB))
+
+            # 智能调整大小：保持宽高比，最长边不超过设定值
+            max_size = getattr(Config, 'MAX_FACE_SIZE', 512)  # 默认最大512像素
+
+            original_width, original_height = face_pil.size
+            scale_factor = min(max_size / original_width, max_size / original_height)
+
+            new_width = int(original_width * scale_factor)
+            new_height = int(original_height * scale_factor)
+
+            face_resized = face_pil.resize((new_width, new_height), Image.LANCZOS)
+
+            print(f"✅ 人脸裁剪: 位置({x},{y}), 原始尺寸({w}x{h})")
+            print(f"✅ 调整后尺寸: {face_resized.size} (缩放因子: {scale_factor:.2f})")
 
             return face_resized, best_confidence
 
         except Exception as e:
-            print(f"增强人脸检测错误: {str(e)}")
+            print(f"人脸检测错误: {str(e)}")
             return None, 0
