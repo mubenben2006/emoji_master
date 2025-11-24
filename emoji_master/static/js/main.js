@@ -1,8 +1,15 @@
+
 class EmojiMaster {
     constructor() {
         this.initializeEventListeners();
         this.currentResultImage = null;
-        this.currentFile = null; // 添加这个属性来保存当前文件
+        this.currentFile = null;
+        this.brightenFactor = 0.8;
+        this.darkenFactor = 0.5;
+        this.lowCutoffPercent = 40;
+        this.highCutoffPercent = 80;
+        this.borderCleanupPixels = 3; // 默认3像素清理
+        this.isAdvancedOpen = false;
     }
 
     initializeEventListeners() {
@@ -11,13 +18,19 @@ class EmojiMaster {
         const generateBtn = document.getElementById('generateBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const regenerateBtn = document.getElementById('regenerateBtn');
+        const brightenSlider = document.getElementById('brightenSlider');
+        const darkenSlider = document.getElementById('darkenSlider');
+        const lowThresholdSlider = document.getElementById('lowThresholdSlider');
+        const highThresholdSlider = document.getElementById('highThresholdSlider');
+        const borderCleanupSlider = document.getElementById('borderCleanupSlider');
+        const advancedControls = document.querySelector('.advanced-controls');
+        const styleOptions = document.querySelectorAll('.style-option');
 
-        // 上传区域点击事件
+        // 上传区域事件
         uploadArea.addEventListener('click', () => {
             photoInput.click();
         });
 
-        // 文件选择事件
         photoInput.addEventListener('change', (e) => {
             this.handleFileSelect(e);
         });
@@ -39,20 +52,80 @@ class EmojiMaster {
             this.handleFileDrop(e);
         });
 
-        // 生成按钮事件
+        // 风格选择事件
+        styleOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                styleOptions.forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+            });
+        });
+
+        // 滑块事件
+        brightenSlider.addEventListener('input', (e) => {
+            this.brightenFactor = parseFloat(e.target.value);
+            document.getElementById('brightenValue').textContent = this.brightenFactor.toFixed(1);
+        });
+
+        darkenSlider.addEventListener('input', (e) => {
+            this.darkenFactor = parseFloat(e.target.value);
+            document.getElementById('darkenValue').textContent = this.darkenFactor.toFixed(1);
+        });
+
+        lowThresholdSlider.addEventListener('input', (e) => {
+            this.lowCutoffPercent = parseInt(e.target.value);
+            document.getElementById('lowThresholdValue').textContent = this.lowCutoffPercent + '%';
+        });
+
+        highThresholdSlider.addEventListener('input', (e) => {
+            this.highCutoffPercent = parseInt(e.target.value);
+            document.getElementById('highThresholdValue').textContent = this.highCutoffPercent + '%';
+        });
+
+        // 边界清理滑块事件
+        borderCleanupSlider.addEventListener('input', (e) => {
+            this.borderCleanupPixels = parseInt(e.target.value);
+            document.getElementById('borderCleanupValue').textContent = this.borderCleanupPixels + 'px';
+        });
+
+        // 高级控制面板切换
+        advancedControls.addEventListener('click', (e) => {
+            if (e.target.closest('.controls-header')) {
+                this.toggleAdvancedControls();
+            }
+        });
+
+        // 按钮事件
         generateBtn.addEventListener('click', () => {
             this.generateEmoji();
         });
 
-        // 下载按钮事件
         downloadBtn.addEventListener('click', () => {
             this.downloadResult();
         });
 
-        // 重新生成按钮事件
         regenerateBtn.addEventListener('click', () => {
             this.showUploadSection();
         });
+
+        // 图片点击下载
+        document.getElementById('resultImage')?.addEventListener('click', () => {
+            this.downloadResult();
+        });
+    }
+
+    toggleAdvancedControls() {
+        const controlsContent = document.querySelector('.controls-content');
+        const toggleArrow = document.querySelector('.toggle-arrow i');
+        
+        this.isAdvancedOpen = !this.isAdvancedOpen;
+        
+        if (this.isAdvancedOpen) {
+            controlsContent.style.display = 'grid';
+            toggleArrow.style.transform = 'rotate(180deg)';
+        } else {
+            controlsContent.style.display = 'none';
+            toggleArrow.style.transform = 'rotate(0deg)';
+        }
     }
 
     handleFileSelect(event) {
@@ -70,26 +143,19 @@ class EmojiMaster {
     }
 
     validateAndSetFile(file) {
-        // 验证文件类型
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
         if (!allowedTypes.includes(file.type)) {
             this.showError('请上传 JPG、PNG 或 GIF 格式的图片');
             return;
         }
 
-        // 验证文件大小 (5MB)
         if (file.size > 5 * 1024 * 1024) {
             this.showError('文件大小不能超过 5MB');
             return;
         }
 
-        // 保存当前文件
         this.currentFile = file;
-
-        // 显示文件预览
         this.displayFilePreview(file);
-
-        // 启用生成按钮
         document.getElementById('generateBtn').disabled = false;
     }
 
@@ -97,18 +163,21 @@ class EmojiMaster {
         const reader = new FileReader();
         reader.onload = (e) => {
             const uploadArea = document.getElementById('uploadArea');
-            // 保留文件输入元素，只是更新显示内容
             uploadArea.innerHTML = `
                 <div style="text-align: center;">
-                    <div style="font-size: 3em; margin-bottom: 10px;">✅</div>
+                    <div style="font-size: 3em; margin-bottom: 10px; color: #4facfe;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
                     <h3>文件已选择</h3>
-                    <p>${file.name}</p>
-                    <p style="font-size: 0.8em; color: #666;">点击重新选择</p>
+                    <p style="margin-bottom: 10px;">${file.name}</p>
+                    <div class="file-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>点击重新选择</span>
+                    </div>
                 </div>
                 <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.gif" hidden>
             `;
 
-            // 重新绑定文件输入事件
             const newPhotoInput = document.getElementById('photoInput');
             newPhotoInput.addEventListener('change', (e) => {
                 this.handleFileSelect(e);
@@ -117,21 +186,29 @@ class EmojiMaster {
         reader.readAsDataURL(file);
     }
 
+    getSelectedStyle() {
+        const activeOption = document.querySelector('.style-option.active');
+        return activeOption ? activeOption.dataset.style : 'panda';
+    }
+
     async generateEmoji() {
-        // 使用保存的 currentFile，而不是从 DOM 获取
         if (!this.currentFile) {
             this.showError('请先选择照片');
             return;
         }
 
-        const styleSelect = document.getElementById('styleSelect');
+        console.log('🔍 前端调试 - 边界清理像素:', this.borderCleanupPixels);
 
-        // 显示加载状态
         this.showLoading();
 
         const formData = new FormData();
         formData.append('photo', this.currentFile);
-        formData.append('style', styleSelect.value);
+        formData.append('style', this.getSelectedStyle());
+        formData.append('brighten_factor', this.brightenFactor);
+        formData.append('darken_factor', this.darkenFactor);
+        formData.append('low_cutoff_percent', this.lowCutoffPercent);
+        formData.append('high_cutoff_percent', this.highCutoffPercent);
+        formData.append('border_cleanup_pixels', this.borderCleanupPixels);
 
         try {
             const response = await fetch('/generate', {
@@ -165,7 +242,6 @@ class EmojiMaster {
 
         resultImage.src = imageData;
         this.currentResultImage = imageData;
-
         resultSection.style.display = 'block';
     }
 
@@ -178,31 +254,33 @@ class EmojiMaster {
         errorMessage.textContent = message;
         errorSection.style.display = 'block';
 
-        // 3秒后自动隐藏错误信息
         setTimeout(() => {
             errorSection.style.display = 'none';
-        }, 3000);
+        }, 5000);
     }
 
     showUploadSection() {
         this.hideAllSections();
 
-        // 重置上传区域
         const uploadArea = document.getElementById('uploadArea');
         uploadArea.innerHTML = `
-            <div class="upload-icon">📁</div>
-            <h3>点击或拖拽上传照片</h3>
-            <p>支持 JPG、PNG 格式，文件大小 ≤ 5MB</p>
+            <div class="upload-icon">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <h3>上传照片开始创作</h3>
+            <p>拖拽或点击上传 JPG、PNG 格式图片</p>
+            <div class="file-info">
+                <i class="fas fa-info-circle"></i>
+                <span>文件大小 ≤ 5MB</span>
+            </div>
             <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.gif" hidden>
         `;
 
-        // 重新绑定文件输入事件
         const newPhotoInput = document.getElementById('photoInput');
         newPhotoInput.addEventListener('change', (e) => {
             this.handleFileSelect(e);
         });
 
-        // 重置状态
         this.currentFile = null;
         document.getElementById('generateBtn').disabled = true;
     }
