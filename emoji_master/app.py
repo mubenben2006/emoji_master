@@ -22,14 +22,17 @@ print(f"📁 应用目录: {Config.BASE_DIR}")
 # 初始化各模块
 print("🔄 初始化模块...")
 face_detector = FaceDetector()
-face_processor = FaceProcessor()
+# 修改这里：将 face_detector 传递给 FaceProcessor
+face_processor = FaceProcessor(face_detector)
 style_synthesizer = StyleSynthesizer()
 file_manager = FileManager()
 print("✅ 所有模块初始化完成")
 
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/generate', methods=['POST'])
 def generate_emoji():
@@ -38,8 +41,6 @@ def generate_emoji():
     print("🚀 收到生成表情包请求")
 
     try:
-        
-        # 检查文件上传
         if 'photo' not in request.files:
             print("❌ 没有文件上传")
             return jsonify({
@@ -50,10 +51,24 @@ def generate_emoji():
         photo_file = request.files['photo']
         style = request.form.get('style', 'panda')
 
+        # 获取所有调节参数
+        brighten_factor = float(request.form.get('brighten_factor', 0.8))
+        darken_factor = float(request.form.get('darken_factor', 0.5))
+        low_cutoff_percent = float(request.form.get('low_cutoff_percent', 40))
+        high_cutoff_percent = float(request.form.get('high_cutoff_percent', 10))
+        border_cleanup_pixels = int(request.form.get('border_cleanup_pixels', 3))
+
+        # 验证参数范围
+        border_cleanup_pixels = max(0, min(100, border_cleanup_pixels))
+
         print(f"📸 上传文件: {photo_file.filename}")
         print(f"🎨 选择风格: {style}")
+        print(f"🔆 亮比例: {brighten_factor}")
+        print(f"🌙 暗比例: {darken_factor}")
+        print(f"📊 暗阈值: {low_cutoff_percent}%")
+        print(f"📊 亮阈值: {high_cutoff_percent}%")
+        print(f"🧹 边界清理: {border_cleanup_pixels}像素")
 
-        # 验证文件
         if photo_file.filename == '':
             print("❌ 空文件名")
             return jsonify({
@@ -68,33 +83,47 @@ def generate_emoji():
                 'message': '不支持的文件格式，请上传JPG、PNG或GIF格式的图片'
             }), 400
 
-        # 保存上传的文件
         upload_path = file_manager.save_upload_file(photo_file)
         print(f"💾 文件保存到: {upload_path}")
-        print(f"💾 文件是否存在: {os.path.exists(upload_path)}")
 
         try:
-            # 1. 人脸检测
-            print("\n🔍 开始人脸检测...")
-            face_image, confidence = face_detector.detect_faces_with_confidence(upload_path)
-            print(f"📊 人脸检测置信度: {confidence}")
+            # 1. 人脸检测 - 不进行边界清理，只获取椭圆信息
+            print("\n🔍 开始面部特征检测...")
+            face_image, confidence, ellipse_info = face_detector.detect_facial_features_with_confidence(
+                upload_path,
+                border_cleanup_pixels=0  # 这里设为0，不在检测阶段清理边界
+            )
+            print(f"📊 面部特征检测置信度: {confidence}")
 
             if face_image is None or confidence < Config.FACE_DETECTION_CONFIDENCE:
-                # 如果增强检测失败，尝试普通检测
-                print("🔄 尝试普通人脸检测...")
-                face_image, face_confidence = face_detector.detect_faces_with_confidence(upload_path)
+                print("🔄 特征检测不理想，尝试简化人脸检测...")
+                face_image, confidence, ellipse_info = face_detector.simple_face_detection(
+                    upload_path,
+                    border_cleanup_pixels=0  # 这里也设为0
+                )
+
                 if face_image is None:
                     print("❌ 未检测到人脸")
                     return jsonify({
                         'status': 'error',
                         'message': '未检测到清晰人脸，请上传包含清晰正面人脸的图片'
                     }), 400
+                else:
+                    print(f"✅ 简化检测成功: {face_image.size}, 置信度: {confidence}")
 
-            print(f"✅ 人脸检测成功: {face_image.size}")
+            print(f"✅ 检测成功: {face_image.size}, 最终置信度: {confidence}")
 
-            # 2. 人脸处理
+            # 2. 人脸处理 - 传递所有参数包括椭圆信息和边界清理参数
             print("\n🎨 开始人脸处理...")
-            processed_face = face_processor.process_face(face_image)
+            processed_face = face_processor.process_face(
+                face_image,
+                brighten_factor=brighten_factor,
+                darken_factor=darken_factor,
+                low_cutoff_percent=low_cutoff_percent,
+                high_cutoff_percent=high_cutoff_percent,
+                ellipse_info=ellipse_info,
+                border_cleanup_pixels=border_cleanup_pixels  # 在这里传递边界清理参数
+            )
             print("✅ 人脸处理完成")
 
             # 3. 风格合成
@@ -125,7 +154,6 @@ def generate_emoji():
             }), 500
 
         finally:
-            # 清理临时文件
             file_manager.cleanup_file(upload_path)
             print(f"🧹 清理临时文件: {upload_path}")
 
@@ -137,6 +165,7 @@ def generate_emoji():
             'status': 'error',
             'message': '服务器内部错误'
         }), 500
+
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -155,6 +184,7 @@ def download_file(filename):
             'status': 'error',
             'message': '下载失败'
         }), 500
+
 
 if __name__ == '__main__':
     print("\n🌐 启动Flask服务器...")
