@@ -3,63 +3,643 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>表情包大师 - 在线生成专属表情包</title>
+    <title>表情包大师 - AI智能表情生成</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+    <!-- 背景动画 -->
+    <div class="background-animation">
+        <div class="floating-emoji">😎</div>
+        <div class="floating-emoji">🤩</div>
+        <div class="floating-emoji">😜</div>
+        <div class="floating-emoji">🤪</div>
+        <div class="floating-emoji">🎭</div>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>😎 表情包大师</h1>
-            <p>上传照片，一键生成专属表情包！</p>
+        <!-- 头部 -->
+        <header class="hero-header">
+            <div class="logo">
+                <i class="fas fa-robot"></i>
+                <h1>表情包大师</h1>
+            </div>
+            <p class="tagline">AI智能驱动 · 一键生成专属表情包</p>
         </header>
 
-        <main>
-            <div class="upload-section">
+        <main class="main-content">
+            <!-- 上传区域 -->
+            <section class="upload-section glass-card" id="uploadSection">
                 <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📁</div>
-                    <h3>点击或拖拽上传照片</h3>
-                    <p>支持 JPG、PNG 格式，文件大小 ≤ 5MB</p>
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h3>上传照片开始创作</h3>
+                    <p>拖拽或点击上传 JPG、PNG 格式图片</p>
+                    <div class="file-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>文件大小 ≤ 5MB</span>
+                    </div>
                     <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.gif" hidden>
                 </div>
 
+                <!-- 风格选择 -->
                 <div class="style-selection">
-                    <label for="styleSelect">选择表情包风格：</label>
-                    <select id="styleSelect">
-                        <option value="panda">🐼 熊猫头</option>
-                        <option value="mushroom">🍄 蘑菇头</option>
-                        <option value="dragon">🐉 龙图</option>
-                    </select>
+                    <div class="section-header">
+                        <label class="section-label">
+                            <i class="fas fa-palette"></i>
+                            选择表情风格
+                        </label>
+                        <button class="add-style-btn" id="addStyleBtn">
+                            <i class="fas fa-plus"></i>
+                            上传自定义模板
+                        </button>
+                    </div>
+
+                    <div class="style-grid" id="styleGrid">
+                        <!-- 默认风格选项 -->
+                        <div class="style-option active" data-style="panda">
+                            <div class="style-icon">🐼</div>
+                            <span>熊猫头</span>
+                            <div class="style-badge">系统</div>
+                        </div>
+                        <div class="style-option" data-style="mushroom">
+                            <div class="style-icon">🍄</div>
+                            <span>蘑菇头</span>
+                            <div class="style-badge">系统</div>
+                        </div>
+                        <div class="style-option" data-style="dragon">
+                            <div class="style-icon">🐉</div>
+                            <span>龙图</span>
+                            <div class="style-badge">系统</div>
+                        </div>
+                        <!-- 自定义风格会动态添加到这里 -->
+                    </div>
                 </div>
 
-                <button id="generateBtn" class="generate-btn" disabled>生成表情包</button>
-            </div>
+                <!-- 自定义模板管理模态框 -->
+                <div class="modal-overlay" id="styleUploadModal" style="display: none;">
+                    <div class="modal-content glass-card">
+                        <div class="modal-header">
+                            <h3 id="modalTitle"><i class="fas fa-upload"></i> 上传自定义模板</h3>
+                            <button class="close-modal" id="closeModal">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="template-upload-area" id="templateUploadArea">
+                                <div class="upload-icon">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                                <h4>上传模板图片</h4>
+                                <p>支持 PNG 格式，建议使用透明背景</p>
+                                <div class="file-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>模板尺寸建议 512x512 像素</span>
+                                </div>
+                                <input type="file" id="templateInput" accept=".png" hidden>
+                                <div class="upload-hint">
+                                    <small>点击或拖拽上传 PNG 格式模板</small>
+                                </div>
+                            </div>
 
-            <div class="result-section" id="resultSection" style="display: none;">
-                <h3>生成结果</h3>
-                <div class="result-image-container">
-                    <img id="resultImage" src="" alt="生成的表情包">
+                            <div class="template-preview" id="templatePreview" style="display: none;">
+                                <img id="templatePreviewImage" src="" alt="模板预览">
+                                <div class="template-info">
+                                    <h5>模板预览</h5>
+                                    <p id="templateSizeInfo"></p>
+                                    <button class="change-template-btn" id="changeTemplateBtn">
+                                        <i class="fas fa-exchange-alt"></i> 更换模板
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="template-settings">
+                                <div class="form-group">
+                                    <label for="styleName">
+                                        <i class="fas fa-tag"></i>
+                                        风格名称 *
+                                    </label>
+                                    <input type="text" id="styleName" placeholder="输入风格名称，如：猫猫头" maxlength="20">
+                                    <small class="form-hint">必填，不超过20个字符</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="styleDescription">
+                                        <i class="fas fa-align-left"></i>
+                                        风格描述（可选）
+                                    </label>
+                                    <textarea id="styleDescription" placeholder="描述这个风格的特点..." rows="2" maxlength="100"></textarea>
+                                    <small class="form-hint">可选，不超过100个字符</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="cancel-btn" id="cancelUpload">取消</button>
+                            <button class="confirm-btn" id="confirmUpload" disabled>
+                                <i class="fas fa-save"></i>
+                                保存模板
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级调节面板 -->
+                <div class="advanced-controls">
+                    <div class="controls-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>高级调节</span>
+                        <div class="toggle-arrow">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+
+                    <div class="controls-content" style="display: none;">
+                        <!-- 亮暗比例调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>亮度调节</span>
+                                <i class="fas fa-sun"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="brightenSlider">亮部增强 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="brightenSlider" min="0" max="100" step="1" value="50">
+                                    <span id="brightenValue" class="value-display">50%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>控制亮部区域的增强程度 (0-100%)</small>
+                                </div>
+                            </div>
+                            <div class="slider-control">
+                                <label for="darkenSlider">暗部减弱 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="darkenSlider" min="0" max="100" step="1" value="50">
+                                    <span id="darkenValue" class="value-display">50%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>控制暗部区域的减弱程度 (0-100%)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 阈值调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>阈值调节</span>
+                                <i class="fas fa-wave-square"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="lowThresholdSlider">暗部阈值 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="lowThresholdSlider" min="0" max="100" step="1" value="30">
+                                    <span id="lowThresholdValue" class="value-display">30%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>低于此阈值的像素会被减弱 (0-100%)</small>
+                                </div>
+                            </div>
+                            <div class="slider-control">
+                                <label for="highThresholdSlider">亮部阈值 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="highThresholdSlider" min="0" max="100" step="1" value="70">
+                                    <span id="highThresholdValue" class="value-display">20%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>高于此阈值的像素会被增强 (0-100%)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 边界清理调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>边界清理</span>
+                                <i class="fas fa-border-style"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="borderCleanupSlider">清理像素</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="borderCleanupSlider" min="0" max="20" step="1" value="2">
+                                    <span id="borderCleanupValue" class="value-display">2px</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>清理椭圆边界的黑色像素范围 (0-20像素)，设为0可关闭清理</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-preset="default">重置设置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="generateBtn" class="generate-btn" disabled>
+                        <i class="fas fa-magic"></i>
+                        <span>生成表情包</span>
+                    </button>
+                    <button id="resetBtn" class="reset-btn">
+                        <i class="fas fa-redo"></i>
+                        <span>重置设置</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 结果区域 -->
+            <section class="result-section glass-card" id="resultSection" style="display: none;">
+                <div class="result-header">
+                    <div class="result-title">
+                        <h3><i class="fas fa-check-circle"></i>生成完成</h3>
+                        <p>你的专属表情包已就绪</p>
+                    </div>
+                    <div class="result-stats">
+                        <div class="stat-item">
+                            <i class="fas fa-clock"></i>
+                            <span>用时: <span id="generationTime">2.5</span>秒</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span>质量: <span id="qualityScore">98</span>%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="result-content">
+                    <div class="result-image-container">
+                        <img id="resultImage" src="" alt="生成的表情包">
+                        <div class="image-overlay">
+                            <div class="overlay-content">
+                                <i class="fas fa-download"></i>
+                                <span>点击下载</span>
+                            </div>
+                        </div>
+                        <div class="image-actions">
+                            <button class="zoom-in-btn" id="zoomInBtn">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="zoom-out-btn" id="zoomOutBtn">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button class="rotate-btn" id="rotateBtn">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="result-details">
+                        <h4><i class="fas fa-info-circle"></i> 生成详情</h4>
+                        <div class="detail-list">
+                            <div class="detail-item">
+                                <span>使用风格:</span>
+                                <span id="usedStyle">熊猫头</span>
+                            </div>
+                            <div class="detail-item">
+                                <span>生成时间:</span>
+                                <span id="generationDate">2025-01-01 12:00:00</span>
+                            </div>
+                            <div class="detail-item">
+                                <span>图像尺寸:</span>
+                                <span id="imageDimensions">512x512 px</span>
+                            </div>
+                            <div class="detail-item">
+                                <span>文件大小:</span>
+                                <span id="imageSize">125 KB</span>
+                            </div>
+                            <div class="detail-item">
+                                <span>亮部增强:</span>
+                                <span id="resultBrightenDisplay">50%</span>
+                            </div>
+                            <div class="detail-item">
+                                <span>暗部减弱:</span>
+                                <span id="resultDarkenDisplay">50%</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="result-actions">
-                    <button id="downloadBtn" class="download-btn">下载表情包</button>
-                    <button id="regenerateBtn" class="regenerate-btn">重新生成</button>
+                    <button id="adjustBtn" class="adjust-btn">
+                        <i class="fas fa-sliders-h"></i>
+                        调整参数
+                    </button>
+                    <button id="downloadBtn" class="download-btn">
+                        <i class="fas fa-download"></i>
+                        下载表情包
+                    </button>
+                    <button id="newImageBtn" class="new-image-btn">
+                        <i class="fas fa-plus"></i>
+                        新图片
+                    </button>
+                </div>
+
+                <div class="result-tips">
+                    <i class="fas fa-lightbulb"></i>
+                    <p>提示：长按图片可直接保存到相册</p>
+                </div>
+            </section>
+
+            <!-- 结果调整面板 - 直接显示在结果区域下方 -->
+            <div class="result-adjust-section glass-card" id="resultAdjustSection" style="display: none;">
+                <div class="adjust-header">
+                    <h3><i class="fas fa-sliders-h"></i> 调整表情包参数</h3>
+                    <p>修改参数后点击"重新生成"即可更新表情包</p>
+                </div>
+
+                <!-- 复用原有的高级调节面板内容 -->
+                <div class="advanced-controls">
+                    <div class="controls-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>高级调节</span>
+                        <div class="toggle-arrow">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+
+                    <div class="controls-content" style="display: grid;">
+                        <!-- 亮暗比例调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>亮度调节</span>
+                                <i class="fas fa-sun"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="resultBrightenSlider">亮部增强 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="resultBrightenSlider" min="0" max="100" step="1" value="50">
+                                    <span id="resultBrightenValue" class="value-display">50%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>控制亮部区域的增强程度 (0-100%)</small>
+                                </div>
+                            </div>
+                            <div class="slider-control">
+                                <label for="resultDarkenSlider">暗部减弱 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="resultDarkenSlider" min="0" max="100" step="1" value="50">
+                                    <span id="resultDarkenValue" class="value-display">50%</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>控制暗部区域的减弱程度 (0-100%)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 阈值调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>阈值调节</span>
+                                <i class="fas fa-wave-square"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="resultLowThresholdSlider">暗部阈值 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="resultLowThresholdSlider" min="0" max="100" step="1" value="30">
+                                    <span id="resultLowThresholdValue" class="value-display">30%</span>
+                                </div>
+                            </div>
+                            <div class="slider-control">
+                                <label for="resultHighThresholdSlider">亮部阈值 (%)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="resultHighThresholdSlider" min="0" max="100" step="1" value="70">
+                                    <span id="resultHighThresholdValue" class="value-display">20%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 边界清理调节 -->
+                        <div class="control-group">
+                            <div class="control-header">
+                                <span>边界清理</span>
+                                <i class="fas fa-border-style"></i>
+                            </div>
+                            <div class="slider-control">
+                                <label for="resultBorderCleanupSlider">清理像素</label>
+                                <div class="slider-with-value">
+                                    <input type="range" id="resultBorderCleanupSlider" min="0" max="20" step="1" value="2">
+                                    <span id="resultBorderCleanupValue" class="value-display">2px</span>
+                                </div>
+                                <div class="slider-description">
+                                    <small>清理椭圆边界的黑色像素范围 (0-20像素)，设为0可关闭清理</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-preset="default">重置设置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="adjust-actions">
+                    <button id="regenerateBtn" class="regenerate-btn">
+                        <i class="fas fa-redo"></i>
+                        重新生成
+                    </button>
+                    <button id="cancelAdjustBtn" class="cancel-adjust-btn">
+                        <i class="fas fa-times"></i>
+                        完成调整
+                    </button>
                 </div>
             </div>
 
-            <div class="loading-section" id="loadingSection" style="display: none;">
-                <div class="spinner"></div>
-                <p>正在生成表情包，请稍候...</p>
-            </div>
+            <!-- 加载状态 -->
+            <section class="loading-section glass-card" id="loadingSection" style="display: none;">
+                <div class="loading-content">
+                    <div class="ai-loader">
+                        <div class="ai-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="pulse-ring"></div>
+                        <div class="pulse-ring delay-1"></div>
+                        <div class="pulse-ring delay-2"></div>
+                    </div>
+                    <h3>AI正在创作中...</h3>
+                    <p>智能分析面部特征，生成专属表情包</p>
 
-            <div class="error-section" id="errorSection" style="display: none;">
-                <div class="error-message" id="errorMessage"></div>
+                    <div class="loading-steps">
+                        <div class="loading-step active">
+                            <div class="step-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <span>人脸检测</span>
+                        </div>
+                        <div class="loading-step">
+                            <div class="step-icon">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <span>图像处理</span>
+                        </div>
+                        <div class="loading-step">
+                            <div class="step-icon">
+                                <i class="fas fa-paint-brush"></i>
+                            </div>
+                            <span>风格合成</span>
+                        </div>
+                        <div class="loading-step">
+                            <div class="step-icon">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <span>完成生成</span>
+                        </div>
+                    </div>
+
+                    <div class="loading-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span id="progressText">25%</span>
+                        </div>
+                    </div>
+
+                    <div class="loading-tips">
+                        <i class="fas fa-bulb"></i>
+                        <span id="loadingTip">正在检测人脸位置...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 错误提示 -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <div class="error-message glass-card">
+                    <div class="error-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="error-content">
+                        <h4>生成失败</h4>
+                        <p id="errorMessage">处理过程中出现错误，请重试</p>
+                        <div class="error-suggestions">
+                            <p>建议：</p>
+                            <ul>
+                                <li>确保照片包含清晰正面人脸</li>
+                                <li>检查网络连接</li>
+                                <li>尝试重新上传图片</li>
+                                <li>降低高级调节参数</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <button class="retry-btn" id="retryBtn">
+                        <i class="fas fa-redo"></i>
+                        重试
+                    </button>
+                </div>
+            </section>
+
+            <!-- 成功提示 -->
+            <div class="success-toast" id="successToast" style="display: none;">
+                <div class="toast-content">
+                    <i class="fas fa-check-circle"></i>
+                    <span id="toastMessage">操作成功！</span>
+                </div>
             </div>
         </main>
 
-        <footer>
-            <p>&copy; 2025 表情包大师 - 程序设计实验项目</p>
+        <!-- 页脚 -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="#" class="footer-link">
+                        <i class="fas fa-book"></i>
+                        使用教程
+                    </a>
+                    <a href="#" class="footer-link">
+                        <i class="fas fa-question-circle"></i>
+                        常见问题
+                    </a>
+                    <a href="#" class="footer-link" onclick="showContactEmail()">
+                        <i class="fas fa-envelope"></i>
+                        问题反馈
+                    </a>
+                </div>
+                <div class="tech-stack">
+                    <span>Powered by AI · Flask · OpenCV</span>
+                </div>
+                <p>&copy; 2025 表情包大师 - 智能图像处理实验室</p>
+                <div class="social-links">
+                    <a href="https://github.com" class="social-link" target="_blank">
+                        <i class="fab fa-github"></i>
+                    </a>
+                    <a href="#" class="social-link" onclick="showContactEmail()">
+                        <i class="fas fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
         </footer>
     </div>
 
+    <!-- 图片查看器 -->
+    <div class="image-viewer" id="imageViewer" style="display: none;">
+        <div class="viewer-content">
+            <img id="viewerImage" src="" alt="查看图片">
+            <button class="close-viewer" id="closeViewer">&times;</button>
+            <div class="viewer-tools">
+                <button class="viewer-tool" id="zoomInViewer">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="viewer-tool" id="zoomOutViewer">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button class="viewer-tool" id="rotateViewer">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="viewer-tool" id="downloadViewer">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮箱联系提示 -->
+    <div class="email-modal" id="emailModal" style="display: none;">
+        <div class="email-content glass-card">
+            <div class="email-header">
+                <h3><i class="fas fa-envelope"></i> 问题反馈邮箱</h3>
+                <button class="close-email" onclick="closeContactEmail()">&times;</button>
+            </div>
+            <div class="email-body">
+                <p>如您在使用过程中遇到任何问题或有改进建议，请发送邮件至：</p>
+                <div class="email-address">
+                    <code>384059368@qq.com</code>
+                    <button class="copy-email" onclick="copyEmail()">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <p class="email-tip">我们会在1-3个工作日内回复您，感谢您的支持！</p>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    // 邮箱功能脚本
+    function showContactEmail() {
+        document.getElementById('emailModal').style.display = 'flex';
+    }
+
+    function closeContactEmail() {
+        document.getElementById('emailModal').style.display = 'none';
+    }
+
+    function copyEmail() {
+        const email = '384059368@qq.com';
+        navigator.clipboard.writeText(email).then(() => {
+            alert('邮箱地址已复制到剪贴板！');
+        }).catch(err => {
+            // 降级方案
+            const textArea = document.createElement('textarea');
+            textArea.value = email;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('邮箱地址已复制到剪贴板！');
+        });
+    }
+
+    // 点击模态框外部关闭
+    document.getElementById('emailModal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'emailModal') {
+            closeContactEmail();
+        }
+    });
+    </script>
 </body>
 </html>
