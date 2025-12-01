@@ -1,139 +1,123 @@
-from PIL import Image, ImageEnhance
 import os
+import json
 import numpy as np
+from PIL import Image, ImageDraw
 from config import Config
+from datetime import datetime
+from pathlib import Path
+
 
 class StyleSynthesizer:
-    """风格合成模块 - 优化版本"""
+    """风格合成模块 - 支持自定义模板"""
 
     def __init__(self):
-        self.styles_folder = Config.STYLES_FOLDER
+        # 将路径转换为Path对象以便使用/运算符
+        self.styles_folder = Path(Config.STYLES_FOLDER)  # 转换为Path对象
         self.available_styles = Config.AVAILABLE_STYLES
-
-        print(f"\n🎨 风格合成器初始化")
-        print(f"📁 模板目录: {self.styles_folder}")
-
-        # 验证模板
-        self._validate_templates()
-
-    def _validate_templates(self):
-        """验证所有模板文件"""
-        print("🔍 验证模板文件:")
-        valid_count = 0
-        for style_name, filename in self.available_styles.items():
-            template_path = os.path.join(self.styles_folder, filename)
-            if os.path.exists(template_path):
-                try:
-                    with Image.open(template_path) as img:
-                        status = f"✅ {style_name}: {filename} - 就绪 ({img.size})"
-                        valid_count += 1
-                except Exception as e:
-                    status = f"❌ {style_name}: {filename} - 损坏: {e}"
-            else:
-                status = f"❌ {style_name}: {filename} - 不存在"
-            print(f"   {status}")
-
-        print(f"📊 模板验证完成: {valid_count}/{len(self.available_styles)} 个模板可用")
+        self.synthesis_config = Config.STYLE_SYNTHESIS
+        self.custom_templates_file = self.styles_folder / 'custom_templates.json'
 
     def synthesize_style(self, face_image, style_name):
-        """合成风格表情包 - 优化版本"""
+        """合成风格表情包 - 支持系统模板和自定义模板"""
         try:
-            print(f"\n" + "=" * 50)
-            print(f"🎨 开始合成风格: {style_name}")
-
-            # 获取模板路径
-            template_path = self._get_template_path(style_name)
-            if template_path is None:
-                print(f"❌ 模板文件不存在: {style_name}")
-                return self._create_fallback_image(face_image, style_name)
-
-            # 加载并验证模板
-            template = self._load_and_validate_template(template_path)
+            # 获取模板
+            template = self._load_template(style_name)
             if template is None:
-                return self._create_fallback_image(face_image, style_name)
+                print(f"❌ 模板加载失败: {style_name}")
+                return self._create_fallback(face_image, style_name)
 
-            # 调整人脸尺寸
-            face_resized = self._resize_face_for_template(face_image, template.size)
+            # 调整人脸尺寸 - 使用新的尺寸计算方法
+            face_resized = self._resize_face_for_template_new(face_image, template.size)
 
-            # 使用优化的Alpha混合
-            result = self._alpha_blend_images(template, face_resized)
+            # 合成图像
+            result = self._blend_images(template, face_resized)
 
-            print("🎉 合成完成!")
-            print("=" * 50)
+            print(f"✅ 风格合成成功: {style_name}")
             return result
 
         except Exception as e:
-            print(f"❌ 风格合成错误: {str(e)}")
+            print(f"❌ 风格合成错误: {e}")
             import traceback
             traceback.print_exc()
-            return self._create_fallback_image(face_image, style_name)
+            return self._create_fallback(face_image, style_name)
 
-    def _get_template_path(self, style_name):
-        """获取模板文件路径"""
-        template_filename = self.available_styles.get(style_name)
-        if template_filename is None:
-            print(f"❌ 未知风格: {style_name}")
-            return None
+    def _load_template(self, style_name):
+        """加载风格模板 - 支持系统模板和自定义模板"""
+        # 先检查是否是系统模板
+        if style_name in self.available_styles:
+            template_filename = self.available_styles[style_name]
+            template_path = self.styles_folder / template_filename
+        else:
+            # 检查是否是自定义模板
+            template_path = self._get_custom_template_path(style_name)
+            if not template_path:
+                print(f"❌ 未找到模板: {style_name}")
+                return None
 
-        template_path = os.path.join(self.styles_folder, template_filename)
-        if not os.path.exists(template_path):
+        if not template_path.exists():
             print(f"❌ 模板文件不存在: {template_path}")
-            self._debug_template_directory()
             return None
 
-        return template_path
-
-    def _debug_template_directory(self):
-        """调试模板目录"""
-        if os.path.exists(self.styles_folder):
-            print(f"📁 模板目录内容:")
-            files = os.listdir(self.styles_folder)
-            for file in files[:10]:  # 只显示前10个文件
-                print(f"   - {file}")
-            if len(files) > 10:
-                print(f"   ... 还有 {len(files) - 10} 个文件")
-
-    def _load_and_validate_template(self, template_path):
-        """加载并验证模板"""
         try:
-            template = Image.open(template_path)
-            print(f"📏 模板尺寸: {template.size}, 模式: {template.mode}")
-
-            # 转换为RGBA确保透明度支持
+            template = Image.open(str(template_path))
             if template.mode != 'RGBA':
                 template = template.convert('RGBA')
-                print("🔄 模板已转换为RGBA模式")
-
+            print(f"✅ 加载模板成功: {style_name} ({template.size})")
             return template
         except Exception as e:
-            print(f"❌ 模板加载失败: {str(e)}")
+            print(f"❌ 模板加载失败 {template_path}: {e}")
             return None
 
-    def _resize_face_for_template(self, face_image, template_size):
-        """智能调整人脸尺寸"""
+    def _get_custom_template_path(self, style_name):
+        """获取自定义模板路径"""
+        if not self.custom_templates_file.exists():
+            return None
+
+        try:
+            with open(self.custom_templates_file, 'r', encoding='utf-8') as f:
+                templates = json.load(f)
+
+            if style_name in templates:
+                filename = templates[style_name]['filename']
+                return self.styles_folder / filename
+        except Exception as e:
+            print(f"❌ 读取自定义模板配置失败: {e}")
+
+        return None
+
+    def _resize_face_for_template_new(self, face_image, template_size):
+        """新的调整人脸尺寸方法，防止人脸过大"""
         template_width, template_height = template_size
 
-        # 根据模板大小计算合适的人脸尺寸
-        base_size = min(template_width, template_height) * 0.5  # 模板大小的50%
+        # 使用更小的比例，防止人脸过大
+        base_size = int(min(template_width, template_height) * self.synthesis_config['face_size_ratio'])
 
-        # 保持人脸宽高比
+        # 限制最大尺寸
+        max_face_size = Config.MAX_FACE_SIZE
+        if base_size > max_face_size:
+            base_size = max_face_size
+
+        print(f"📏 基础尺寸计算: 模板{template_size} -> 基础{base_size}")
+
+        # 保持宽高比
         face_ratio = face_image.width / face_image.height
         if face_ratio > 1.2:  # 宽脸
-            new_width = int(base_size)
+            new_width = base_size
             new_height = int(base_size / face_ratio)
         elif face_ratio < 0.8:  # 长脸
-            new_height = int(base_size)
+            new_height = base_size
             new_width = int(base_size * face_ratio)
         else:  # 正常比例
-            new_size = int(base_size)
-            new_width = new_size
-            new_height = new_size
+            new_width = new_height = base_size
 
         # 确保最小尺寸
-        new_width = max(new_width, 80)
-        new_height = max(new_height, 80)
+        new_width = max(new_width, self.synthesis_config['min_face_size'])
+        new_height = max(new_height, self.synthesis_config['min_face_size'])
 
-        print(f"📐 人脸调整: {face_image.size} -> ({new_width}, {new_height})")
+        # 额外限制：不能超过模板的60%
+        max_template_percent = 0.6
+        new_width = min(new_width, int(template_width * max_template_percent))
+        new_height = min(new_height, int(template_height * max_template_percent))
 
         face_resized = face_image.resize((new_width, new_height), Image.LANCZOS)
 
@@ -141,100 +125,118 @@ class StyleSynthesizer:
         if face_resized.mode != 'RGBA':
             face_resized = face_resized.convert('RGBA')
 
+        print(f"📏 人脸调整尺寸: {face_image.size} -> {face_resized.size}")
         return face_resized
 
-    def _alpha_blend_images(self, template, face_image):
-        """使用Alpha混合合成图像 - 优化版本"""
-        # 转换为NumPy数组进行高效操作
-        template_np = np.array(template)
-        face_np = np.array(face_image)
+    def _resize_face_for_template(self, face_image, template_size):
+        """调整人脸尺寸以适应模板 - 保留旧方法兼容性"""
+        return self._resize_face_for_template_new(face_image, template_size)
 
-        # 创建结果副本
-        result_np = template_np.copy()
-
-        # 计算放置位置（居中）
-        template_h, template_w = template_np.shape[:2]
-        face_h, face_w = face_np.shape[:2]
-
-        pos_x = (template_w - face_w) // 2
-        pos_y = (template_h - face_h) // 2
-
-        print(f"📍 合成位置: ({pos_x}, {pos_y})")
-        print(f"🔍 人脸Alpha范围: {face_np[:, :, 3].min()} - {face_np[:, :, 3].max()}")
-
-        # 计算有效区域（防止越界）
-        start_x = max(0, pos_x)
-        start_y = max(0, pos_y)
-        end_x = min(template_w, pos_x + face_w)
-        end_y = min(template_h, pos_y + face_h)
-
-        # 计算对应的face区域
-        face_start_x = max(0, -pos_x)
-        face_start_y = max(0, -pos_y)
-        face_end_x = face_start_x + (end_x - start_x)
-        face_end_y = face_start_y + (end_y - start_y)
-
-        # 提取有效区域
-        template_region = result_np[start_y:end_y, start_x:end_x]
-        face_region = face_np[face_start_y:face_end_y, face_start_x:face_end_x]
-
-        # 归一化alpha通道
-        face_alpha = face_region[:, :, 3] / 255.0
-        template_alpha = template_region[:, :, 3] / 255.0
-
-        # Alpha混合公式
-        for channel in range(3):  # RGB通道
-            template_region[:, :, channel] = (
-                    face_region[:, :, channel] * face_alpha +
-                    template_region[:, :, channel] * (1 - face_alpha)
-            )
-
-        # 合并alpha通道
-        combined_alpha = np.maximum(template_alpha, face_alpha) * 255
-        template_region[:, :, 3] = combined_alpha.astype(np.uint8)
-
-        # 更新结果
-        result_np[start_y:end_y, start_x:end_x] = template_region
-
-        return Image.fromarray(result_np)
-
-    def _create_fallback_image(self, face_image, style_name):
-        """创建回退图像"""
-        print("🔄 使用回退方案")
-
-        # 创建简单背景
-        bg_colors = {
-            'panda': (240, 240, 240),
-            'mushroom': (255, 230, 230),
-            'dragon': (230, 255, 230)
-        }
-        bg_color = bg_colors.get(style_name, (230, 230, 255))
-
-        result = Image.new('RGBA', (512, 512), (*bg_color, 255))
-        draw = ImageDraw.Draw(result)
-
-        # 调整人脸大小
-        face_size = min(300, face_image.width, face_image.height)
-        face_resized = face_image.resize((face_size, face_size), Image.LANCZOS)
-
-        # 放置人脸
-        position = ((512 - face_size) // 2, (512 - face_size) // 2)
-        result.paste(face_resized, position, face_resized)
-
-        # 添加边框和文字
-        draw.rectangle(
-            [position[0] - 5, position[1] - 5, position[0] + face_size + 5, position[1] + face_size + 5],
-            outline=(100, 100, 100, 255), width=2
-        )
-
-        # 添加说明文字
+    def _blend_images(self, template, face_image):
+        """混合模板和人脸图像"""
         try:
-            text = f"{style_name} - 模板加载失败"
-            bbox = draw.textbbox((0, 0), text)
-            text_width = bbox[2] - bbox[0]
-            text_position = ((512 - text_width) // 2, 450)
-            draw.text(text_position, text, fill=(255, 0, 0, 255))
-        except:
-            pass
+            # 确保模板和人脸都是RGBA
+            if template.mode != 'RGBA':
+                template = template.convert('RGBA')
+            if face_image.mode != 'RGBA':
+                face_image = face_image.convert('RGBA')
+
+            # 创建新的合成图像
+            result = template.copy()
+
+            # 计算放置位置（居中）
+            template_width, template_height = template.size
+            face_width, face_height = face_image.size
+
+            pos_x = (template_width - face_width) // 2
+            pos_y = (template_height - face_height) // 2
+
+            # 确保位置有效
+            pos_x = max(0, pos_x)
+            pos_y = max(0, pos_y)
+
+            # 创建临时图像用于混合
+            temp_image = Image.new('RGBA', template.size, (0, 0, 0, 0))
+            temp_image.paste(face_image, (pos_x, pos_y))
+
+            # Alpha混合
+            result = Image.alpha_composite(result, temp_image)
+
+            print("✅ 图像混合成功")
+            return result
+
+        except Exception as e:
+            print(f"❌ 图像混合失败: {e}")
+            # 如果混合失败，返回简单叠加
+            result = template.copy()
+            pos_x = (template.width - face_image.width) // 2
+            pos_y = (template.height - face_image.height) // 2
+            result.paste(face_image, (pos_x, pos_y), mask=face_image)
+            return result
+
+    def _create_fallback(self, face_image, style_name):
+        """创建回退图像"""
+        print(f"⚠️ 创建回退图像: {style_name}")
+        width, height = self.synthesis_config['fallback_size']
+        result = Image.new('RGB', (width, height), color=(240, 240, 240))
+
+        # 调整人脸大小并居中放置
+        face_size = min(200, face_image.width, face_image.height)  # 减小回退图像中的人脸尺寸
+        face_resized = face_image.resize((face_size, face_size), Image.LANCZOS)
+        position = ((width - face_size) // 2, (height - face_size) // 2)
+
+        if face_resized.mode == 'RGBA':
+            result.paste(face_resized, position, mask=face_resized)
+        else:
+            result.paste(face_resized, position)
 
         return result
+
+    def save_custom_template(self, template_file, style_name, description=""):
+        """保存自定义模板"""
+        try:
+            # 确保目录存在
+            self.styles_folder.mkdir(exist_ok=True)
+
+            # 生成唯一文件名
+            import uuid
+            filename = f"custom_{uuid.uuid4().hex}.png"
+            template_path = self.styles_folder / filename
+
+            # 保存模板文件（PIL的save方法）
+            template_file.save(str(template_path))
+
+            # 更新配置文件
+            templates = {}
+            if self.custom_templates_file.exists():
+                with open(self.custom_templates_file, 'r', encoding='utf-8') as f:
+                    templates = json.load(f)
+
+            templates[style_name] = {
+                'filename': filename,
+                'description': description,
+                'created_at': str(datetime.now()),
+                'type': 'custom'
+            }
+
+            with open(self.custom_templates_file, 'w', encoding='utf-8') as f:
+                json.dump(templates, f, ensure_ascii=False, indent=2)
+
+            print(f"✅ 自定义模板保存成功: {style_name}")
+            return True
+
+        except Exception as e:
+            print(f"❌ 保存自定义模板失败: {e}")
+            return False
+
+    def get_custom_templates(self):
+        """获取所有自定义模板"""
+        if not self.custom_templates_file.exists():
+            return {}
+
+        try:
+            with open(self.custom_templates_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"❌ 读取自定义模板失败: {e}")
+            return {}
